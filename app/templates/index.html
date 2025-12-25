@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz An Toàn Bảo Mật</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🛡️ Quiz An Toàn Bảo Mật</h1>
+            <p class="subtitle">Dành cho tèo sex</p>
+        </header>
+
+        <div class="quiz-info">
+            <div class="score-board">
+                <span class="score">Điểm: <strong id="score">0</strong></span>
+                <span class="progress">Câu: <strong id="current">0</strong>/<strong id="total">10</strong></span>
+            </div>
+        </div>
+
+        <main class="quiz-container" id="quiz">
+            <div class="start-screen" id="startScreen">
+                <div class="start-content">
+                    <h2>Sẵn sàng kiểm tra kiến thức?</h2>
+                    <p>Tổng số câu hỏi có sẵn: <strong>{{ total_questions }}</strong></p>
+                    <div class="settings">
+                        <label>
+                            Số câu hỏi:
+                            <select id="questionCount">
+                                <option value="5">5 câu</option>
+                                <option value="10" selected>10 câu</option>
+                                <option value="20">20 câu</option>
+                                <option value="50">50 câu</option>
+                            </select>
+                        </label>
+                    </div>
+                    <button class="btn-start" onclick="startQuiz()">Bắt đầu Quiz</button>
+                </div>
+            </div>
+
+            <div class="question-screen hidden" id="questionScreen">
+                <div class="question-card">
+                    <div class="question-header">
+                        <span class="question-number" id="qNumber">Câu 1</span>
+                    </div>
+                    <h2 class="question-text" id="qText"></h2>
+                    <div class="options" id="options"></div>
+                </div>
+                <div class="feedback hidden" id="feedback">
+                    <p id="feedbackText"></p>
+                </div>
+                <button class="btn-next hidden" id="nextBtn" onclick="nextQuestion()">Câu tiếp theo →</button>
+            </div>
+
+            <div class="result-screen hidden" id="resultScreen">
+                <div class="result-card">
+                    <h2>🎉 Hoàn thành!</h2>
+                    <div class="final-score">
+                        <span id="finalScore">0</span>/<span id="finalTotal">10</span>
+                    </div>
+                    <p class="result-message" id="resultMessage"></p>
+                    <button class="btn-restart" onclick="location.reload()">Làm lại</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let questions = [];
+        let currentIndex = 0;
+        let score = 0;
+        let answered = false;
+
+        async function startQuiz() {
+            const count = document.getElementById('questionCount').value;
+            document.getElementById('total').textContent = count;
+            
+            const response = await fetch(`/api/questions?limit=${count}`);
+            questions = await response.json();
+            
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('questionScreen').classList.remove('hidden');
+            
+            showQuestion();
+        }
+
+        function showQuestion() {
+            answered = false;
+            const q = questions[currentIndex];
+            
+            document.getElementById('current').textContent = currentIndex + 1;
+            document.getElementById('qNumber').textContent = `Câu ${currentIndex + 1}`;
+            document.getElementById('qText').textContent = q.question;
+            
+            const optionsDiv = document.getElementById('options');
+            optionsDiv.innerHTML = '';
+            
+            ['A', 'B', 'C', 'D'].forEach(letter => {
+                if (q.options[letter]) {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.innerHTML = `<span class="option-letter">${letter}</span><span class="option-text">${q.options[letter]}</span>`;
+                    btn.onclick = () => selectAnswer(letter, btn);
+                    optionsDiv.appendChild(btn);
+                }
+            });
+            
+            document.getElementById('feedback').classList.add('hidden');
+            document.getElementById('nextBtn').classList.add('hidden');
+        }
+
+        async function selectAnswer(answer, btn) {
+            if (answered) return;
+            answered = true;
+            
+            const q = questions[currentIndex];
+            const response = await fetch(`/api/check?question_id=${q.id}&answer=${answer}`, {
+                method: 'POST'
+            });
+            const result = await response.json();
+            
+            // Highlight correct/wrong
+            document.querySelectorAll('.option-btn').forEach(b => {
+                b.disabled = true;
+                const letter = b.querySelector('.option-letter').textContent;
+                if (letter === result.correct_answer) {
+                    b.classList.add('correct');
+                } else if (letter === answer && !result.correct) {
+                    b.classList.add('wrong');
+                }
+            });
+            
+            // Show feedback
+            const feedback = document.getElementById('feedback');
+            const feedbackText = document.getElementById('feedbackText');
+            
+            if (result.correct) {
+                score++;
+                document.getElementById('score').textContent = score;
+                feedbackText.textContent = '✅ Chính xác!';
+                feedback.className = 'feedback correct';
+            } else {
+                feedbackText.textContent = `❌ Sai rồi! Đáp án đúng là ${result.correct_answer}`;
+                feedback.className = 'feedback wrong';
+            }
+            feedback.classList.remove('hidden');
+            
+            // Show next button
+            document.getElementById('nextBtn').classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentIndex++;
+            if (currentIndex < questions.length) {
+                showQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            document.getElementById('questionScreen').classList.add('hidden');
+            document.getElementById('resultScreen').classList.remove('hidden');
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalTotal').textContent = questions.length;
+            
+            const percent = (score / questions.length) * 100;
+            let message = '';
+            if (percent >= 90) message = '🌟 Xuất sắc! Bạn là chuyên gia ATBM!';
+            else if (percent >= 70) message = '👍 Tốt lắm! Tiếp tục cố gắng nhé!';
+            else if (percent >= 50) message = '💪 Khá ổn! Cần ôn tập thêm!';
+            else message = '📚 Cố gắng học thêm nhé!';
+            
+            document.getElementById('resultMessage').textContent = message;
+        }
+    </script>
+</body>
+</html>
