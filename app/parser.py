@@ -5,9 +5,10 @@ from pathlib import Path
 
 def parse_quiz_markdown(filepath: str) -> list[dict]:
     """
-    Parse markdown file and extract questions with exactly 4 answer options.
+    Parse markdown file and extract all questions.
+    Questions with 4 options are 'quiz' type, others are 'flashcard' type.
     
-    Returns list of dicts with: id, question, options (A/B/C/D), correct_answer
+    Returns list of dicts with: id, question, type, options/answer, correct
     """
     content = Path(filepath).read_text(encoding="utf-8")
     questions = []
@@ -43,14 +44,31 @@ def parse_quiz_markdown(filepath: str) -> list[dict]:
                 if is_correct:
                     correct = option_letter
         
-        # Only include questions with all 4 options
+        # Questions with 4 options -> quiz type
         if len(options) == 4 and correct:
             questions.append({
                 'id': q_num,
                 'question': q_text,
+                'type': 'quiz',
                 'options': options,
                 'correct': correct
             })
+        else:
+            # Extract flashcard answer (text after * *)
+            flashcard_pattern = r'\*\s*\*(.+?)(?=\n\n|#|\Z)'
+            flashcard_match = re.search(flashcard_pattern, answer_block, re.DOTALL)
+            
+            if flashcard_match:
+                answer_text = flashcard_match.group(1).strip()
+                answer_text = re.sub(r'\s+', ' ', answer_text)
+                questions.append({
+                    'id': q_num,
+                    'question': q_text,
+                    'type': 'flashcard',
+                    'answer': answer_text,
+                    'options': {},
+                    'correct': None
+                })
     
     return questions
 

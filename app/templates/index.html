@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quiz An Toàn Bảo Mật</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
     <div class="container">
         <header>
             <h1>🛡️ Quiz An Toàn Bảo Mật</h1>
-            <p class="subtitle">Dành cho tèo sex</p>
+            <p class="subtitle">Dành cho bạn thân mnc</p>
         </header>
 
         <div class="quiz-info">
@@ -23,31 +25,63 @@
         <main class="quiz-container" id="quiz">
             <div class="start-screen" id="startScreen">
                 <div class="start-content">
-                    <h2>Sẵn sàng kiểm tra kiến thức?</h2>
+                    <h2>Chọn chế độ luyện tập</h2>
                     <p>Tổng số câu hỏi có sẵn: <strong>{{ total_questions }}</strong></p>
-                    <div class="settings">
-                        <label>
-                            Số câu hỏi:
-                            <select id="questionCount">
-                                <option value="5">5 câu</option>
-                                <option value="10" selected>10 câu</option>
-                                <option value="20">20 câu</option>
-                                <option value="50">50 câu</option>
-                            </select>
-                        </label>
+
+                    <div class="mode-tabs">
+                        <button class="tab-btn active" onclick="switchTab('practice')">📚 Luyện tập</button>
+                        <button class="tab-btn" onclick="switchTab('random')">🎲 Ngẫu nhiên</button>
                     </div>
-                    <button class="btn-start" onclick="startQuiz()">Bắt đầu Quiz</button>
+
+                    <!-- Practice Mode -->
+                    <div class="mode-content" id="practiceMode">
+                        <h3>Chọn khoảng câu hỏi:</h3>
+                        <div class="range-options">
+                            <button class="range-btn" onclick="startPractice(1, 50)">Câu 1 - 50</button>
+                            <button class="range-btn" onclick="startPractice(51, 100)">Câu 51 - 100</button>
+                            <button class="range-btn" onclick="startPractice(101, 150)">Câu 101 - 150</button>
+                            <button class="range-btn" onclick="startPractice(151, 200)">Câu 151 - 200</button>
+                            <button class="range-btn" onclick="startPractice(201, 250)">Câu 201 - 250</button>
+                            <button class="range-btn" onclick="startPractice(251, 300)">Câu 251 - 300</button>
+                        </div>
+                    </div>
+
+                    <!-- Random Mode -->
+                    <div class="mode-content hidden" id="randomMode">
+                        <h3>Chọn số câu hỏi:</h3>
+                        <div class="range-options">
+                            <button class="range-btn" onclick="startRandom(10)">10 câu</button>
+                            <button class="range-btn" onclick="startRandom(20)">20 câu</button>
+                            <button class="range-btn" onclick="startRandom(50)">50 câu</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <div class="question-screen hidden" id="questionScreen">
+                <div class="nav-buttons">
+                    <button class="btn-nav" onclick="goHome()">🏠 Trang chủ</button>
+                    <button class="btn-nav" id="prevBtn" onclick="prevQuestion()" disabled>← Câu trước</button>
+                </div>
+
                 <div class="question-card">
                     <div class="question-header">
                         <span class="question-number" id="qNumber">Câu 1</span>
+                        <span class="question-id" id="qId"></span>
+                        <span class="question-type" id="qType"></span>
                     </div>
                     <h2 class="question-text" id="qText"></h2>
+
+                    <!-- Quiz options -->
                     <div class="options" id="options"></div>
+
+                    <!-- Flashcard answer -->
+                    <div class="flashcard hidden" id="flashcard">
+                        <button class="btn-reveal" id="revealBtn" onclick="revealAnswer()">👁️ Xem đáp án</button>
+                        <div class="flashcard-answer hidden" id="flashcardAnswer"></div>
+                    </div>
                 </div>
+
                 <div class="feedback hidden" id="feedback">
                     <p id="feedbackText"></p>
                 </div>
@@ -72,56 +106,123 @@
         let currentIndex = 0;
         let score = 0;
         let answered = false;
+        let quizCount = 0;
 
-        async function startQuiz() {
-            const count = document.getElementById('questionCount').value;
-            document.getElementById('total').textContent = count;
-            
-            const response = await fetch(`/api/questions?limit=${count}`);
+        function switchTab(mode) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.mode-content').forEach(content => content.classList.add('hidden'));
+
+            if (mode === 'practice') {
+                document.querySelector('.tab-btn:first-child').classList.add('active');
+                document.getElementById('practiceMode').classList.remove('hidden');
+            } else {
+                document.querySelector('.tab-btn:last-child').classList.add('active');
+                document.getElementById('randomMode').classList.remove('hidden');
+            }
+        }
+
+        function goHome() {
+            if (confirm('Bạn có chắc muốn quay về trang chủ? Tiến độ sẽ bị mất.')) {
+                location.reload();
+            }
+        }
+
+        async function startPractice(start, end) {
+            const response = await fetch(`/api/questions?start=${start}&end=${end}`);
             questions = await response.json();
-            
+
+            if (questions.length === 0) {
+                alert(`Không có câu hỏi trong khoảng ${start}-${end}`);
+                return;
+            }
+
+            quizCount = questions.filter(q => q.type === 'quiz').length;
+            document.getElementById('total').textContent = questions.length;
             document.getElementById('startScreen').classList.add('hidden');
             document.getElementById('questionScreen').classList.remove('hidden');
-            
+
+            showQuestion();
+        }
+
+        async function startRandom(count) {
+            const response = await fetch(`/api/questions?limit=${count}`);
+            questions = await response.json();
+
+            quizCount = questions.filter(q => q.type === 'quiz').length;
+            document.getElementById('total').textContent = questions.length;
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('questionScreen').classList.remove('hidden');
+
             showQuestion();
         }
 
         function showQuestion() {
             answered = false;
             const q = questions[currentIndex];
-            
+
             document.getElementById('current').textContent = currentIndex + 1;
             document.getElementById('qNumber').textContent = `Câu ${currentIndex + 1}`;
+            document.getElementById('qId').textContent = `(#${q.id})`;
             document.getElementById('qText').textContent = q.question;
-            
-            const optionsDiv = document.getElementById('options');
-            optionsDiv.innerHTML = '';
-            
-            ['A', 'B', 'C', 'D'].forEach(letter => {
-                if (q.options[letter]) {
-                    const btn = document.createElement('button');
-                    btn.className = 'option-btn';
-                    btn.innerHTML = `<span class="option-letter">${letter}</span><span class="option-text">${q.options[letter]}</span>`;
-                    btn.onclick = () => selectAnswer(letter, btn);
-                    optionsDiv.appendChild(btn);
-                }
-            });
-            
+
+            // Update prev button
+            document.getElementById('prevBtn').disabled = currentIndex === 0;
+
+            // Hide feedback and next button
             document.getElementById('feedback').classList.add('hidden');
             document.getElementById('nextBtn').classList.add('hidden');
+
+            const optionsDiv = document.getElementById('options');
+            const flashcardDiv = document.getElementById('flashcard');
+            const qTypeSpan = document.getElementById('qType');
+
+            if (q.type === 'quiz') {
+                // Quiz mode
+                qTypeSpan.textContent = '📝 Trắc nghiệm';
+                qTypeSpan.className = 'question-type quiz';
+                optionsDiv.classList.remove('hidden');
+                flashcardDiv.classList.add('hidden');
+
+                optionsDiv.innerHTML = '';
+                ['A', 'B', 'C', 'D'].forEach(letter => {
+                    if (q.options[letter]) {
+                        const btn = document.createElement('button');
+                        btn.className = 'option-btn';
+                        btn.innerHTML = `<span class="option-letter">${letter}</span><span class="option-text">${q.options[letter]}</span>`;
+                        btn.onclick = () => selectAnswer(letter, btn);
+                        optionsDiv.appendChild(btn);
+                    }
+                });
+            } else {
+                // Flashcard mode
+                qTypeSpan.textContent = '📖 Flashcard';
+                qTypeSpan.className = 'question-type flashcard';
+                optionsDiv.classList.add('hidden');
+                flashcardDiv.classList.remove('hidden');
+
+                document.getElementById('revealBtn').classList.remove('hidden');
+                document.getElementById('flashcardAnswer').classList.add('hidden');
+                document.getElementById('flashcardAnswer').textContent = q.answer;
+            }
+        }
+
+        function revealAnswer() {
+            document.getElementById('revealBtn').classList.add('hidden');
+            document.getElementById('flashcardAnswer').classList.remove('hidden');
+            document.getElementById('nextBtn').classList.remove('hidden');
+            answered = true;
         }
 
         async function selectAnswer(answer, btn) {
             if (answered) return;
             answered = true;
-            
+
             const q = questions[currentIndex];
             const response = await fetch(`/api/check?question_id=${q.id}&answer=${answer}`, {
                 method: 'POST'
             });
             const result = await response.json();
-            
-            // Highlight correct/wrong
+
             document.querySelectorAll('.option-btn').forEach(b => {
                 b.disabled = true;
                 const letter = b.querySelector('.option-letter').textContent;
@@ -131,11 +232,10 @@
                     b.classList.add('wrong');
                 }
             });
-            
-            // Show feedback
+
             const feedback = document.getElementById('feedback');
             const feedbackText = document.getElementById('feedbackText');
-            
+
             if (result.correct) {
                 score++;
                 document.getElementById('score').textContent = score;
@@ -146,9 +246,15 @@
                 feedback.className = 'feedback wrong';
             }
             feedback.classList.remove('hidden');
-            
-            // Show next button
+
             document.getElementById('nextBtn').classList.remove('hidden');
+        }
+
+        function prevQuestion() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                showQuestion();
+            }
         }
 
         function nextQuestion() {
@@ -163,19 +269,20 @@
         function showResults() {
             document.getElementById('questionScreen').classList.add('hidden');
             document.getElementById('resultScreen').classList.remove('hidden');
-            
+
             document.getElementById('finalScore').textContent = score;
-            document.getElementById('finalTotal').textContent = questions.length;
-            
-            const percent = (score / questions.length) * 100;
+            document.getElementById('finalTotal').textContent = quizCount;
+
+            const percent = quizCount > 0 ? (score / quizCount) * 100 : 100;
             let message = '';
             if (percent >= 90) message = '🌟 Xuất sắc! Bạn là chuyên gia ATBM!';
             else if (percent >= 70) message = '👍 Tốt lắm! Tiếp tục cố gắng nhé!';
             else if (percent >= 50) message = '💪 Khá ổn! Cần ôn tập thêm!';
             else message = '📚 Cố gắng học thêm nhé!';
-            
+
             document.getElementById('resultMessage').textContent = message;
         }
     </script>
 </body>
+
 </html>

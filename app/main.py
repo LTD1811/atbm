@@ -31,19 +31,27 @@ async def home(request: Request):
 
 
 @app.get("/api/questions")
-async def get_questions(shuffle: bool = True, limit: int = 10):
-    """Get quiz questions."""
-    questions = QUESTIONS.copy()
-    if shuffle:
-        random.shuffle(questions)
-    if limit:
-        questions = questions[:limit]
+async def get_questions(shuffle: bool = True, limit: int = 10, start: int = None, end: int = None):
+    """Get quiz questions. Use start/end for range mode, or shuffle+limit for random mode."""
+    if start is not None and end is not None:
+        # Practice mode: get questions by ID range
+        questions = [q for q in QUESTIONS if start <= q["id"] <= end]
+        questions.sort(key=lambda x: x["id"])
+    else:
+        # Random mode
+        questions = QUESTIONS.copy()
+        if shuffle:
+            random.shuffle(questions)
+        if limit:
+            questions = questions[:limit]
     
-    # Return without correct answers for client
+    # Return questions with type info
     return [{
         "id": q["id"],
         "question": q["question"],
-        "options": q["options"]
+        "type": q.get("type", "quiz"),
+        "options": q.get("options", {}),
+        "answer": q.get("answer", "")
     } for q in questions]
 
 
