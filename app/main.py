@@ -17,7 +17,7 @@ app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # Load questions once at startup
-QUIZ_FILE = BASE_DIR.parent / "docs" / "300 câu ATBM dành cho HS tiểu học.md"
+QUIZ_FILE = BASE_DIR.parent / "docs" / "300 câu hỏi ôn tập.md"
 QUESTIONS = parse_quiz_markdown(str(QUIZ_FILE))
 
 
