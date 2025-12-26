@@ -57,12 +57,23 @@ async def get_questions(shuffle: bool = True, limit: int = 10, start: int = None
 
 @app.post("/api/check")
 async def check_answer(question_id: int, answer: str):
-    """Check if answer is correct."""
+    """Check if answer is correct and return explanation."""
     for q in QUESTIONS:
         if q["id"] == question_id:
             is_correct = q["correct"] == answer.upper()
+            correct_answer = q["correct"]
+            
+            # Generate explanation from correct answer
+            explanation = ""
+            if q.get("type") == "quiz" and correct_answer:
+                correct_text = q.get("options", {}).get(correct_answer, "")
+                explanation = f"Đáp án đúng là {correct_answer}: {correct_text}"
+            elif q.get("type") == "flashcard":
+                explanation = q.get("answer", "")
+            
             return {
                 "correct": is_correct,
-                "correct_answer": q["correct"]
+                "correct_answer": correct_answer,
+                "explanation": explanation
             }
     return {"error": "Question not found"}
