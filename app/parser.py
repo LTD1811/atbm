@@ -13,9 +13,9 @@ def parse_quiz_markdown(filepath: str) -> list[dict]:
     content = Path(filepath).read_text(encoding="utf-8")
     questions = []
     
-    # Split by question headers: # **number\. Question text**
-    pattern = r'# \*\*(\d+)\\?\.\s*(.+?)\*\*'
-    matches = list(re.finditer(pattern, content))
+    # Split by question headers: # **number\. Question text (ends at newline)
+    pattern = r'^# \*\*(\d+)\\?\.\s*(.+)$'
+    matches = list(re.finditer(pattern, content, re.MULTILINE))
     
     for i, match in enumerate(matches):
         q_num = int(match.group(1))
